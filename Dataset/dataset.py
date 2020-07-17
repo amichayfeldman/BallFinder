@@ -29,7 +29,7 @@ class BallDataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.data)
 
-    def change_img_size(self):  #TODO: complete this method
+    def change_img_size(self):
         random_w_power = torch.randint(8, np.log2(1280))
         random_h_power = torch.randint(8, np.log2(720))
         self.img_w, self.img_h = 2**random_w_power, 2**random_h_power
@@ -43,22 +43,21 @@ class BallDataset(torch.utils.data.Dataset):
         if self.mode == 'test':
             tensored_image = torch.from_numpy(image)
             tensored_gt = torch.from_numpy(gt_mask)
-            sample = {'image': tensored_image, 'gt':tensored_gt, 'idx':idx}
+            sample = {'image': tensored_image.permute(2, 0, 1), 'gt':tensored_gt.permute(2, 0, 1), 'idx':[idx]}
             return sample
         else:
             seq = iaa.Sequential([iaa.Fliplr(0.5),
-                                  iaa.OneOf([iaa.GaussianBlur((0, 3.0)), iaa.AverageBlur(k=(2, 7)),
+                                  iaa.OneOf([iaa.GaussianBlur((0, 5.0)), iaa.AverageBlur(k=(2, 7)),
                                              iaa.MedianBlur(k=(3, 11))]),
                                   iaa.OneOf([iaa.Add((-10, 10), per_channel=0.5),
                                              iaa.Multiply((0.7, 1.3), per_channel=0.5)])])
 
             augmented_img = seq(images=image)
-            after_crop = random_crop(image=augmented_img, gt_image=gt_mask, out_width=self.img_w,
-                                         out_height=self.img_h, zoom=bool(torch.FloatTensor(1).uniform_(0, 1) > 0.5))
+            after_crop = random_crop(image=augmented_img, gt_image=gt_mask, out_width=self.img_w, out_height=self.img_h)
 
             tensored_image = torch.from_numpy(after_crop['image'])
             tensored_gt = torch.from_numpy(after_crop['gt'])
-            sample = {'image': tensored_image, 'gt': tensored_gt, 'idx': idx}
+            sample = {'image': tensored_image.permute(2, 0, 1), 'gt': tensored_gt.permute(2, 0 , 1), 'idx': [idx]}
             return sample
 
 
@@ -67,11 +66,12 @@ def get_dataloaders(dataset_folders, gt_folders, batch_size, num_workers, shuffl
     Get train, val and test dataloaders of Ballfinder.
     :param dataset_folders: Dict. Paths for dataset input images with structure of
     {'train':<str>, 'val':<str>, 'test':<str>}
-    :param gt_folders:
-    :param batch_size:
-    :param num_workers:
-    :param shuffle:
-    :return:
+    :param gt_folders: Dict. Paths for dataset input images with structure of
+    {'train':<str>, 'val':<str>, 'test':<str>}
+    :param batch_size: int.
+    :param num_workers: int.
+    :param shuffle: Boolean.
+    :return: Three Dataloaders for training.
     """
     train_set = BallDataset(dataset_folders['train'], gt_folders['train'], img_h=720, img_w=1280, mode='train')
     val_set = BallDataset(dataset_folders['val'], gt_folders['val'], img_h=720, img_w=1280, mode='val')
@@ -84,12 +84,3 @@ def get_dataloaders(dataset_folders, gt_folders, batch_size, num_workers, shuffl
                                                    num_workers=num_workers)
     return train_dataloader, val_dataloader, test_dataloader
 
-if __name__ == "__main__":
-    dataset_folders= {'train': '/home/amichay/DL/BallDetector/Dataset/frames/video1',
-                      'val': '/home/amichay/DL/BallDetector/Dataset/frames/video1',
-                      'test': '/home/amichay/DL/BallDetector/Dataset/frames/video2'}
-    gt_folders = {'train': '/home/amichay/DL/BallDetector/Dataset/frames/video1',
-                       'val': '/home/amichay/DL/BallDetector/Dataset/frames/video1',
-                       'test': '/home/amichay/DL/BallDetector/Dataset/frames/video2'}
-    train_dl, val_dl, test_dl = get_dataloaders(dataset_folders, gt_folders, 8, 4)
-    a = next(iter(train_dl))
