@@ -44,7 +44,7 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
             outputs = model(inputs)
             outputs = softmax(outputs)
             loss = criterion_loss(outputs, labels)
-            dice_score = dice_loss(output=outputs, target=labels)
+            dice_score = dice_loss(output=outputs, target=labels)  # TODO: add dice loss to total loss
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
@@ -61,7 +61,7 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
             outputs = model(inputs)
             outputs = softmax(outputs)
             loss = criterion_loss(outputs, labels)
-            dice_score = dice_loss(output=outputs, target=labels)
+            dice_score = dice_loss(output=outputs, target=labels)  # TODO: add dice loss to total loss
             val_running_loss += loss.item()
         val_loss = val_running_loss / val_i
         val_loss_list.append(val_loss.data.item())
