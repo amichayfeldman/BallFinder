@@ -7,7 +7,7 @@ import configparser
 from Dataset.dataset import get_dataloaders
 from Model.model import BallDetectorModel
 import torch.nn as nn
-from Utils.FocalLoss import FocalLoss
+from Utils.Losses import FocalLoss, dice_loss
 
 
 def save_model(model, epoch, output_path, best=False):
@@ -44,6 +44,7 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
             outputs = model(inputs)
             outputs = softmax(outputs)
             loss = criterion_loss(outputs, labels)
+            dice_score = dice_loss(output=outputs, target=labels)
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
@@ -60,6 +61,7 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
             outputs = model(inputs)
             outputs = softmax(outputs)
             loss = criterion_loss(outputs, labels)
+            dice_score = dice_loss(output=outputs, target=labels)
             val_running_loss += loss.item()
         val_loss = val_running_loss / val_i
         val_loss_list.append(val_loss.data.item())
