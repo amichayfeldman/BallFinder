@@ -43,7 +43,7 @@ class BallDataset(torch.utils.data.Dataset):
         if self.mode == 'test':
             tensored_image = torch.from_numpy(image)
             tensored_gt = torch.from_numpy(gt_mask)
-            sample = {'image': tensored_image.permute(2, 0, 1), 'gt':tensored_gt.permute(2, 0, 1), 'idx':[idx]}
+            sample = {'image': tensored_image.permute(2, 0, 1), 'gt':tensored_gt, 'idx':[idx]}
             return sample
         else:
             seq = iaa.Sequential([iaa.Fliplr(0.5),
@@ -57,7 +57,7 @@ class BallDataset(torch.utils.data.Dataset):
 
             tensored_image = torch.from_numpy(after_crop['image'])
             tensored_gt = torch.from_numpy(after_crop['gt'])
-            sample = {'image': tensored_image.permute(2, 0, 1), 'gt': tensored_gt.permute(2, 0 , 1), 'idx': [idx]}
+            sample = {'image': tensored_image.permute(2, 0, 1), 'gt': tensored_gt, 'idx': [idx]}
             return sample
 
 
