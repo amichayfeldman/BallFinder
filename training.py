@@ -5,7 +5,7 @@ import os
 import glob
 import configparser
 from Dataset.dataset import get_dataloaders
-from Model.model import BallDetectorModel
+from Model.Model import BallDetector
 import torch.nn as nn
 from Utils.Losses import FocalLoss, dice_loss
 
@@ -120,10 +120,10 @@ def main():
     # --- Model --- #
     checkpoint = config['Paths']['model_checkpoint']
     if len(checkpoint) > 0:
-        model = BallDetectorModel()
+        model = BallDetector(config=config)
         model.load_state_dict(torch.load(checkpoint))
     else:
-        model = BallDetectorModel()
+        model = BallDetector(config=config)
         model.apply(init_weights)
     #####################
 
