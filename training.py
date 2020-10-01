@@ -90,7 +90,9 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
         train_dataloader.dataset.change_img_size()
 
         #  PRINT:  #
-        print("Epoch {}:  train loss: {:.5f}, val loss: {:.5f}".format(epoch, train_loss, val_loss))
+        print("Epoch {}:  train loss: {:.5f}, val loss: {:.5f}".format(epoch, train_loss, val_loss)
+
+    return train_loss, val_loss
 
 
 def main():
