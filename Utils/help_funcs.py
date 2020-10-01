@@ -37,7 +37,7 @@ def divide_input_to_patches(x_shape, config):
     break_flag = False
 
     while not break_flag:
-        print(row_start_idx, "",  row_end_idx, "", col_start_idx, "",  col_end_idx)
+        # print(row_start_idx, "",  row_end_idx, "", col_start_idx, "",  col_end_idx)
         if col_end_idx == x_shape[3]:  # end single row
             col_start_idx, col_end_idx = 0, patch_w
             if row_end_idx == x_shape[2]:
@@ -55,10 +55,6 @@ def divide_input_to_patches(x_shape, config):
             col_start_idx, col_end_idx = col_start_idx + int(patch_w / 2), col_end_idx + int(patch_w / 2)
 
         yield row_start_idx, row_end_idx, col_start_idx, col_end_idx
-
-
-
-
 
 
 convert_png_folder_to_jpg('/home/amichay/DL/BallDetector/Dataset/GroundTruth/')
