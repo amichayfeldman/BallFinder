@@ -2,7 +2,8 @@ import numpy as np
 import cv2
 
 
-def random_crop(image, gt_image, out_width, out_height, zoom=False, p=0.5):
+def random_crop(image, gt_image, out_width, out_height, p=0.5):
+    """Randomly cropping augmentation. The cropping executes around the ball blob location."""
     if np.random.uniform() > p:
         return {'image': image, 'gt': gt_image}
     else:
@@ -27,10 +28,6 @@ def random_crop(image, gt_image, out_width, out_height, zoom=False, p=0.5):
 
         cropped_img = image[c_y-h:c_y+b, c_x-l:c_x+r, :]
         cropped_gt_image = gt_image[c_y-h:c_y+b, c_x-l:c_x+r]
-
-        if zoom:
-            cropped_img = cv2.resize(src=cropped_img, dsize=image.shape)
-            cropped_gt_image = cv2.resize(src=cropped_gt_image, dsize=image.shape)
 
         return {'image': cropped_img, 'gt': cropped_gt_image}
 
