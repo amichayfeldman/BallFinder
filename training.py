@@ -5,9 +5,15 @@ import os
 import glob
 import configparser
 from Dataset.dataset import get_dataloaders
-from Model.Model import BallDetector
+from Model.Model import BallDetector, init_weights
 import torch.nn as nn
 from Utils.Losses import FocalLoss, dice_loss
+
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = True
+torch.manual_seed(1)
+torch.cuda.manual_seed_all(3)
+np.random.seed(2)
 
 
 def save_model(model, epoch, output_path, best=False):
@@ -20,11 +26,6 @@ def save_model(model, epoch, output_path, best=False):
         name = os.path.join(output_path, 'Model_stateDict__Epoch={}.pt'.format(epoch))
     torch.save(model.statae_dict(), os.path.join(output_path, name))
 
-
-def init_weights(m):
-    if type(m) == nn.Linear or type(m) == nn.Conv2d:
-        torch.nn.init.xavier_uniform(m.weight)
-        m.bias.data.fill_(0.01)
 
 
 def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optimizer, scheduler, output_path):
@@ -39,7 +40,7 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
     model.to(device)
     softmax = nn.Softmax(dim=1)
 
-    for epoch in epochs:
+    for epoch in range(epochs):
         running_loss = 0.0
         # --- TRAIN:  --- #
         for i, data in enumerate(train_dataloader):
@@ -90,9 +91,9 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
         train_dataloader.dataset.change_img_size()
 
         #  PRINT:  #
-        print("Epoch {}:  train loss: {:.5f}, val loss: {:.5f}".format(epoch, train_loss, val_loss)
+        print("Epoch {}:  train loss: {:.5f}, val loss: {:.5f}".format(epoch, train_loss, val_loss))
 
-    return train_loss, val_loss
+    return train_loss, best_val_loss
 
 
 def main():
@@ -104,15 +105,17 @@ def main():
     wd = config.getfloat('Params', 'wd')
     epochs = config.getint('Params', 'epochs')
     output_folder = config['Paths']['output_folder']
+    if not os.path.isdir(output_folder):
+        os.makedirs(output_folder)
 
     # --- Dataset --- #
     train_images = glob.glob(os.path.join(config['input_images']['train'], '*/*.jpg'))
     val_images = glob.glob(os.path.join(config['input_images']['val'], '*/*.jpg'))
-    train_gt = glob.glob(os.path.join(config['ground_truth']['train'], '*/*.jpg'))
-    val_gt = glob.glob(os.path.join(config['ground_truth']['val'], '*/*.jpg'))
+    train_gt = glob.glob(os.path.join(config['ground_truth']['train'], '*/*/*.jpg'))
+    val_gt = glob.glob(os.path.join(config['ground_truth']['val'], '*/*/*.jpg'))
 
-    datasets_imgs_folders = {'train': train_images, 'val': val_gt}
-    gt_imgs_folders = {'train': val_images, 'val': train_gt}
+    datasets_imgs_folders = {'train': train_images, 'val': val_images}
+    gt_imgs_folders = {'train': train_gt, 'val': val_gt}
 
     train_dataloader, val_dataloader, _ = get_dataloaders(dataset_dict=datasets_imgs_folders,
                                                           gt_dict=gt_imgs_folders,

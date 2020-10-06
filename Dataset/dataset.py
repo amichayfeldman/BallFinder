@@ -6,7 +6,10 @@ import glob
 import re
 import numpy as np
 import imgaug.augmenters as iaa
-from Augmentations import random_crop
+from Dataset.Augmentations import random_crop
+import matplotlib
+matplotlib.use('TKAgg')
+import matplotlib.pyplot as plt
 
 sometimes = lambda aug: iaa.Sometimes(0.5, aug)
 
@@ -18,14 +21,19 @@ class BallDataset(torch.utils.data.Dataset):
         self.gt_imgs_list = gt_list
         self.data = self.data.apply(self.assign_gt_to_img, axis=1)
         self.data.dropna(axis=0, inplace=True)
+        self.data.reset_index(drop=True, inplace=True)
 
         self.img_w, self.img_h = img_w, img_h
         self.mode = mode
 
     def assign_gt_to_img(self, row):
         frame_number = "".join(re.findall("\d+", os.path.basename(row['img_path'])))
-        adjusted_gt = next((x for x in self.gt_imgs_list if frame_number in x))
-        row['gt_path'] = adjusted_gt
+        folder_num = row['img_path'].split('/')[-2][-1]
+        adjusted_gt = [x for x in self.gt_imgs_list if frame_number in x and x.split('/')[-3][-1] == folder_num]
+        if len(adjusted_gt) > 0:
+            row['gt_path'] = adjusted_gt[0]
+        else:
+            row['gt_path'] = None
         return row
 
     def __len__(self):
@@ -76,25 +84,38 @@ def get_dataloaders(dataset_dict, gt_dict, batch_size, num_workers, shuffle=True
     :param shuffle: Boolean.
     :return: Three Dataloaders for training.
     """
-    train_set = BallDataset(dataset_dict['train'], gt_dict['train'], img_h=720, img_w=1280, mode='train')
-    val_set = BallDataset(dataset_dict['val'], gt_dict['val'], img_h=720, img_w=1280, mode='val')
-    test_set = BallDataset(dataset_dict['test'], gt_dict['test'], img_h=720, img_w=1280, mode='test')
+    print("# - # - # - # - # - # - # - # - # - # - # - # - # - #")
     if 'train' in dataset_dict:
+        print("Building train set", end="")
+        train_set = BallDataset(dataset_dict['train'], gt_dict['train'], img_h=720, img_w=1280, mode='train')
+        print("...")
         train_dataloader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=shuffle,
                                                        num_workers=num_workers)
+        print("Finished the train dataloader building")
     else:
         train_dataloader = None
 
     if 'val' in dataset_dict:
+        print("Building val set", end="")
+        val_set = BallDataset(dataset_dict['val'], gt_dict['val'], img_h=720, img_w=1280, mode='val')
+        print("...")
         val_dataloader = torch.utils.data.DataLoader(val_set, batch_size=batch_size, shuffle=shuffle,
                                                        num_workers=num_workers)
+        print("Finished the val dataloader building")
     else:
         val_dataloader = None
 
     if 'test' in dataset_dict:
+        print("Building val set", end="")
+        test_set = BallDataset(dataset_dict['test'], gt_dict['test'], img_h=720, img_w=1280, mode='test')
+        print("...")
         test_dataloader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False,
                                                        num_workers=num_workers)
+        print("Finished the test dataloader building")
     else:
         test_dataloader = None
+
+    print("# - # - # - # - # - # - # - # - # - # - # - # - # - #")
+    print("")
     return train_dataloader, val_dataloader, test_dataloader
 

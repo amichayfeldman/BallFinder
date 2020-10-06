@@ -57,4 +57,4 @@ def divide_input_to_patches(x_shape, config):
         yield row_start_idx, row_end_idx, col_start_idx, col_end_idx
 
 
-convert_png_folder_to_jpg('/home/amichay/DL/BallDetector/Dataset/GroundTruth/')
+# convert_png_folder_to_jpg('/home/amichay/DL/BallDetector/Dataset/GroundTruth/')

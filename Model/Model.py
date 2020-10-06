@@ -14,6 +14,14 @@ def find_closest_num(n, m):
     return n2
 
 
+def init_weights(m):
+    if type(m) == torch.nn.Linear or type(m) == torch.nn.Conv2d:
+        torch.nn.init.xavier_uniform(m.weight)
+        m.bias.data.fill_(0.01)
+
+
+
+
 class BallDetector(torch.nn.Module):
     def __init__(self, config):
         super(BallDetector, self).__init__()
