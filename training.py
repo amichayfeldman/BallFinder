@@ -10,7 +10,7 @@ import torch.nn as nn
 from Utils.Losses import FocalLoss, dice_loss
 
 torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = True
+torch.backends.cudnn.benchmark = False
 torch.manual_seed(1)
 torch.cuda.manual_seed_all(3)
 np.random.seed(2)
@@ -25,7 +25,6 @@ def save_model(model, epoch, output_path, best=False):
     else:
         name = os.path.join(output_path, 'Model_stateDict__Epoch={}.pt'.format(epoch))
     torch.save(model.statae_dict(), os.path.join(output_path, name))
-
 
 
 def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optimizer, scheduler, output_path):
@@ -119,7 +118,7 @@ def main():
 
     train_dataloader, val_dataloader, _ = get_dataloaders(dataset_dict=datasets_imgs_folders,
                                                           gt_dict=gt_imgs_folders,
-                                                          batch_size=batch_size, num_workers=4)
+                                                          batch_size=batch_size, num_workers=0)
     #####################
 
     # --- Model --- #

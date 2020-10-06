@@ -29,28 +29,29 @@ def divide_input_to_patches(x_shape, config):
     :return: Yield each iteration the start & end indices of rows and columns.
     """
     patch_w, patch_h = config.getint('Params', 'patch_w'), config.getint('Params', 'patch_h')
-    col_start_idx, row_start_idx = 0, 0
-    col_end_idx, row_end_idx = patch_w, patch_h
-    if x_shape[2] <= patch_h or x_shape[3] <= patch_w:
-        return row_start_idx, row_end_idx, col_start_idx, col_end_idx
+    col_start_idx, row_start_idx = -int(patch_w / 2), 0
+    col_end_idx, row_end_idx = int(patch_w / 2), patch_h
 
     break_flag = False
-
     while not break_flag:
+        if x_shape[2] <= patch_h or x_shape[3] <= patch_w:
+            yield row_start_idx, row_end_idx, col_start_idx, col_end_idx
+            break_flag = True
+
         # print(row_start_idx, "",  row_end_idx, "", col_start_idx, "",  col_end_idx)
         if col_end_idx == x_shape[3]:  # end single row
             col_start_idx, col_end_idx = 0, patch_w
             if row_end_idx == x_shape[2]:
                 break_flag = True
             elif row_end_idx + int(patch_h / 2) > x_shape[2]:
-                stride_h = x_shape[2] - row_end_idx
+                stride_h = row_end_idx + int(patch_h / 2) - x_shape[2]
                 row_start_idx, row_end_idx = row_start_idx + stride_h, row_end_idx + stride_h
             else:
                 row_start_idx, row_end_idx = row_start_idx + int(patch_h / 2), row_end_idx + int(patch_h / 2)
 
         elif col_end_idx + int(patch_w / 2) > x_shape[3]:  # stride will be smaller than patch_w / 2
-            stride_w = x_shape[3] - col_end_idx
-            col_start_idx, col_end_idx = col_start_idx + stride_w, col_end_idx + stride_w
+            stride_w = col_end_idx + int(patch_w / 2) - x_shape[3]
+            col_start_idx, col_end_idx = col_start_idx - stride_w, col_end_idx - stride_w
         else:
             col_start_idx, col_end_idx = col_start_idx + int(patch_w / 2), col_end_idx + int(patch_w / 2)
 

@@ -16,10 +16,8 @@ def find_closest_num(n, m):
 
 def init_weights(m):
     if type(m) == torch.nn.Linear or type(m) == torch.nn.Conv2d:
-        torch.nn.init.xavier_uniform(m.weight)
+        torch.nn.init.xavier_uniform_(m.weight)
         m.bias.data.fill_(0.01)
-
-
 
 
 class BallDetector(torch.nn.Module):
@@ -53,8 +51,8 @@ class BallDetector(torch.nn.Module):
                                           torch.nn.Conv2d(in_channels=56, out_channels=2, kernel_size=3))
 
     def forward(self, x):
-        out_tensor = torch.zeros(size=x.size())
-        for start_row_idx, end_row_idx, start_col_idx, end_col_idx in divide_input_to_patches(x_shape=list(x.size),
+        out_tensor = torch.zeros(size=torch.Size([x.shape[0], x.shape[2], x.shape[3]]))
+        for start_row_idx, end_row_idx, start_col_idx, end_col_idx in divide_input_to_patches(x_shape=list(x.shape),
                                                                                               config=self.config):
             patch_out = self.feed_forward(input=x[:, :, start_row_idx:end_row_idx, start_col_idx:end_col_idx])
             # TODO: think to add logic to sync patches outputs

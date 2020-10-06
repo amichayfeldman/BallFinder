@@ -6,7 +6,7 @@ import glob
 import re
 import numpy as np
 import imgaug.augmenters as iaa
-from Dataset.Augmentations import random_crop
+from Dataset.Augmentations import random_crop, flip_lr
 import matplotlib
 matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt
@@ -47,28 +47,32 @@ class BallDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         row = self.data.iloc[idx]
         image = cv2.imread(row['img_path'])
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) / 255
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         gt_mask = cv2.imread(row['gt_path'], cv2.IMREAD_GRAYSCALE)
 
         if self.mode == 'test':
-            tensored_image = torch.from_numpy(image)
-            tensored_gt = torch.from_numpy(gt_mask)
-            sample = {'image': tensored_image.permute(2, 0, 1), 'gt':tensored_gt, 'idx':idx}
+            # tensored_image = torch.from_numpy(image)
+            # tensored_gt = torch.from_numpy(gt_mask)
+            sample = {'image': np.moveaxis(image, -1, 0) / 255, 'gt': gt_mask, 'idx': idx}
             return sample
         else:
-            seq = iaa.Sequential([iaa.Fliplr(0.5),
-                                  iaa.OneOf([iaa.GaussianBlur((0, 5.0)),
+            seq = iaa.Sequential([iaa.OneOf([iaa.GaussianBlur((0, 3.0)),
                                              iaa.AverageBlur(k=(2, 7)),
-                                             iaa.MedianBlur(k=(3, 11))]),
+                                             # iaa.MedianBlur(k=(3, 11))
+                                             ]),
                                   sometimes(iaa.OneOf([iaa.Add((-10, 10), per_channel=0.5),
-                                            iaa.Multiply((0.85, 1.15), per_channel=0.5)]))])
+                                            iaa.Multiply((0.85, 1.15), per_channel=0.5)]))
+                                  ])
 
-            augmented_img = seq(images=image)
-            after_crop = random_crop(image=augmented_img, gt_image=gt_mask, out_width=self.img_w, out_height=self.img_h)
+            augmented_img = seq(image=image)
+            flipped_or_not = flip_lr(image=augmented_img, gt_image=gt_mask)
+            after_crop = random_crop(image=flipped_or_not['image'], gt_image=flipped_or_not['gt'],
+                                     out_width=self.img_w, out_height=self.img_h)
 
-            tensored_image = torch.from_numpy(after_crop['image'])
-            tensored_gt = torch.from_numpy(after_crop['gt'])
-            sample = {'image': tensored_image.permute(2, 0, 1), 'gt': tensored_gt, 'idx': idx}
+            # tensored_image = torch.from_numpy(after_crop['image'])
+            # tensored_gt = torch.from_numpy(after_crop['gt'])
+            # sample = {'image': tensored_image.permute(2, 0, 1) // 255, 'gt': tensored_gt, 'idx': idx}
+            sample = {'image': np.moveaxis(after_crop['image'], -1, 0) / 255, 'gt': after_crop['gt']}
             return sample
 
 
