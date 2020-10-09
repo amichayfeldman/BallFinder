@@ -24,34 +24,56 @@ class BallDetector(torch.nn.Module):
     def __init__(self, config):
         super(BallDetector, self).__init__()
         self.config = config
-        self.block1 = torch.nn.Sequential(torch.nn.Conv2d(in_channels=3, out_channels=8, kernel_size=5, stride=2),
-                                          torch.nn.BatchNorm2d(num_features=8),
-                                          torch.nn.Conv2d(in_channels=8, out_channels=8, kernel_size=3),
-                                          torch.nn.BatchNorm2d(num_features=8),
+
+        block1_c = 8
+        self.block1 = torch.nn.Sequential(torch.nn.Conv2d(in_channels=3, out_channels=block1_c, kernel_size=5, stride=2),
+                                          torch.nn.BatchNorm2d(num_features=block1_c),
+                                          torch.nn.Conv2d(in_channels=block1_c, out_channels=block1_c, kernel_size=3),
+                                          torch.nn.BatchNorm2d(num_features=block1_c),
                                           torch.nn.MaxPool2d(kernel_size=2))
 
-        self.block2 = torch.nn.Sequential(torch.nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3),
-                                          torch.nn.BatchNorm2d(num_features=16),
-                                          torch.nn.Conv2d(in_channels=16, out_channels=16, kernel_size=3),
-                                          torch.nn.BatchNorm2d(num_features=16),
+        block2_c = 16
+        self.block2 = torch.nn.Sequential(torch.nn.Conv2d(in_channels=block1_c, out_channels=block2_c, kernel_size=3,
+                                                          padding=1),
+                                          torch.nn.BatchNorm2d(num_features=block2_c),
+                                          torch.nn.Conv2d(in_channels=block2_c, out_channels=block2_c, kernel_size=3,
+                                                          padding=1),
+                                          torch.nn.BatchNorm2d(num_features=block2_c),
                                           torch.nn.MaxPool2d(kernel_size=2))
 
-        self.upsample2 = torch.nn.ConvTranspose2d(in_channels=16, out_channels=16, kernel_size=2)
+        # self.upsample2 = torch.nn.ConvTranspose2d(in_channels=16, out_channels=16, kernel_size=2)
+        self.upsample2 = torch.nn.Upsample(scale_factor=2, mode='bicubic')
 
-        self.block3 = torch.nn.Sequential(torch.nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3),
-                                          torch.nn.BatchNorm2d(num_features=32),
-                                          torch.nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3),
-                                          torch.nn.BatchNorm2d(num_features=32),
+        block3_c = 32
+        self.block3 = torch.nn.Sequential(torch.nn.Conv2d(in_channels=block2_c, out_channels=block3_c, kernel_size=3,
+                                                          padding=1),
+                                          torch.nn.BatchNorm2d(num_features=block3_c),
+                                          torch.nn.Conv2d(in_channels=block3_c, out_channels=block3_c, kernel_size=3,
+                                                          padding=1),
+                                          torch.nn.BatchNorm2d(num_features=block3_c),
                                           torch.nn.MaxPool2d(kernel_size=2))
 
-        self.upsample3 = torch.nn.ConvTranspose2d(in_channels=32, out_channels=32, kernel_size=4)
+        # self.upsample3 = torch.nn.ConvTranspose2d(in_channels=32, out_channels=32, kernel_size=4)
+        self.upsample3 = torch.nn.Upsample(size=(62, 62), mode='bicubic')
 
-        self.block4 = torch.nn.Sequential(torch.nn.Conv2d(in_channels=56, out_channels=56, kernel_size=3),
-                                          torch.nn.BatchNorm2d(num_features=56),
-                                          torch.nn.Conv2d(in_channels=56, out_channels=2, kernel_size=3))
+        block4_c = block1_c + block2_c + block3_c
+        self.block4 = torch.nn.Sequential(torch.nn.Conv2d(in_channels=block4_c, out_channels=block4_c, kernel_size=3,
+                                                          padding=1),
+                                          torch.nn.BatchNorm2d(num_features=block4_c),
+                                          torch.nn.Conv2d(in_channels=block4_c, out_channels=2, kernel_size=3,
+                                                          padding=1))
+
+        self.out1_1_shape, self.out1_2_shape, self.out2_shape, self.out3_shape = [None] * 4
 
     def forward(self, x):
-        out_tensor = torch.zeros(size=torch.Size([x.shape[0], x.shape[2], x.shape[3]]))
+        # compute output tensor shape according to patch sizes and
+        patch_w, patch_h = self.config.getint('Params', 'patch_w'), self.config.getint('Params', 'patch_h')
+        in_w, in_h = x.shape[3], x.shape[2]
+        self.out1_1_shape = (int((in_h - 5) / 2) + 1, int((in_w - 5) / 2) + 1)
+        self.out1_2_shape = (int((self.out1_1_shape[0] - 3 + 1) / 2), int((self.out1_1_shape[1] - 3 + 1) / 2))
+
+        # TODO: change this method to multi-threading
+        out_tensor = torch.zeros(size=torch.Size([x.shape[0], x.shape[1], self.out1_2_shape[0], self.out1_2_shape[1]]))
         for start_row_idx, end_row_idx, start_col_idx, end_col_idx in divide_input_to_patches(x_shape=list(x.shape),
                                                                                               config=self.config):
             patch_out = self.feed_forward(input=x[:, :, start_row_idx:end_row_idx, start_col_idx:end_col_idx])
