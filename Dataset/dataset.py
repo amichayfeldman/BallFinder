@@ -49,6 +49,7 @@ class BallDataset(torch.utils.data.Dataset):
         image = cv2.imread(row['img_path'])
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         gt_mask = cv2.imread(row['gt_path'], cv2.IMREAD_GRAYSCALE)
+        gt_mask[gt_mask > 0] = 1
 
         if self.mode == 'test':
             # tensored_image = torch.from_numpy(image)
@@ -72,7 +73,7 @@ class BallDataset(torch.utils.data.Dataset):
             # tensored_image = torch.from_numpy(after_crop['image'])
             # tensored_gt = torch.from_numpy(after_crop['gt'])
             # sample = {'image': tensored_image.permute(2, 0, 1) // 255, 'gt': tensored_gt, 'idx': idx}
-            sample = {'image': np.moveaxis(after_crop['image'], -1, 0) / 255, 'gt': after_crop['gt']}
+            sample = {'image': np.moveaxis(after_crop['image'], -1, 0) / 255, 'gt': after_crop['gt'], 'idx': idx}
             return sample
 
 

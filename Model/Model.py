@@ -92,8 +92,8 @@ class BallDetector(torch.nn.Module):
             i_w += 1
             out_tensor[:, :, p_h_start:p_h_end, p_w_start:p_w_end] = patch_out.data
 
-        softmax = torch.nn.Softmax(dim=1)
-        softmax(out_tensor)
+        # softmax = torch.nn.Softmax(dim=1)
+        # output = softmax(out_tensor)
         return out_tensor
 
     def feed_forward(self, X):

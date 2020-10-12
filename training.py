@@ -8,6 +8,7 @@ from Dataset.dataset import get_dataloaders
 from Model.Model import BallDetector, init_weights
 import torch.nn as nn
 from Utils.Losses import FocalLoss, dice_loss
+import cv2
 
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
@@ -47,7 +48,11 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
             inputs, labels = data['image'].to(device), data['gt'].to(device)
             optimizer.zero_grad()
             outputs = model(inputs.type(torch.FloatTensor).to(device))
-            loss = criterion_loss(outputs, labels.squeeze().cuda().long())
+            sampled_labels = torch.nn.functional.interpolate(labels.type(torch.FloatTensor).unsqueeze(1),
+                                                             scale_factor=(outputs.shape[2] / labels.shape[1],
+                                                             outputs.shape[3] / labels.shape[2]), mode='bicubic')
+            sampled_labels[sampled_labels != 0] = 1
+            loss = criterion_loss(outputs.cuda(), sampled_labels.squeeze().cuda().long())
             dice_score = dice_loss(output=outputs, target=labels)  # TODO: add dice loss to total loss
             loss.backward()
             optimizer.step()
@@ -63,7 +68,12 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
         for val_i, val_data in enumerate(val_dataloader):
             inputs, labels = val_data['image'].to(device), val_data['gt'].to(device)
             outputs = model(inputs.type(torch.FloatTensor).to(device))
-            loss = criterion_loss(outputs, labels.squeeze().cuda().long())
+            sampled_labels = torch.nn.functional.interpolate(labels.type(torch.FloatTensor).unsqueeze(1),
+                                                             scale_factor=(outputs.shape[2] / labels.shape[1],
+                                                                           outputs.shape[3] / labels.shape[2]),
+                                                             mode='bicubic')
+            sampled_labels[sampled_labels != 0] = 1
+            loss = criterion_loss(outputs.cuda(), sampled_labels.squeeze().cuda().long())
             dice_score = dice_loss(output=outputs, target=labels)  # TODO: add dice loss to total loss
             val_running_loss += loss.item()
         val_loss = val_running_loss / (val_i + 1)
@@ -109,8 +119,8 @@ def main():
     # --- Dataset --- #
     train_images = glob.glob(os.path.join(config['input_images']['train'], '*/*.jpg'))
     val_images = glob.glob(os.path.join(config['input_images']['val'], '*/*.jpg'))
-    train_gt = glob.glob(os.path.join(config['ground_truth']['train'], '*/*/*.jpg'))
-    val_gt = glob.glob(os.path.join(config['ground_truth']['val'], '*/*/*.jpg'))
+    train_gt = glob.glob(os.path.join(config['ground_truth']['train'], '*/*/*.png'))
+    val_gt = glob.glob(os.path.join(config['ground_truth']['val'], '*/*/*.png'))
 
     datasets_imgs_folders = {'train': train_images, 'val': val_images}
     gt_imgs_folders = {'train': train_gt, 'val': val_gt}
