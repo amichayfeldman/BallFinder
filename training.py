@@ -29,6 +29,7 @@ def save_model(model, epoch, output_path, best=False):
 
 def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optimizer, scheduler, output_path):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    assert device.type == 'cuda', "Cuda is not working"
 
     train_loss_list, val_loss_list = [], []
     best_train_loss, best_val_loss = np.inf, np.inf
@@ -46,7 +47,6 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
             inputs, labels = data['image'].to(device), data['gt'].to(device)
             optimizer.zero_grad()
             outputs = model(inputs.type(torch.FloatTensor).to(device))
-            outputs = softmax(outputs)
             loss = criterion_loss(outputs, labels.squeeze().cuda().long())
             dice_score = dice_loss(output=outputs, target=labels)  # TODO: add dice loss to total loss
             loss.backward()
@@ -63,7 +63,6 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
         for val_i, val_data in enumerate(val_dataloader):
             inputs, labels = val_data['image'].to(device), val_data['gt'].to(device)
             outputs = model(inputs.type(torch.FloatTensor).to(device))
-            outputs = softmax(outputs)
             loss = criterion_loss(outputs, labels.squeeze().cuda().long())
             dice_score = dice_loss(output=outputs, target=labels)  # TODO: add dice loss to total loss
             val_running_loss += loss.item()
@@ -92,7 +91,7 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
         #  PRINT:  #
         print("Epoch {}:  train loss: {:.5f}, val loss: {:.5f}".format(epoch, train_loss, val_loss))
 
-    return train_loss, best_val_loss
+    return train_loss, best_val_loss  # return last train loss and the best val loss
 
 
 def main():

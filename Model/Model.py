@@ -24,7 +24,6 @@ class BallDetector(torch.nn.Module):
     def __init__(self, config):
         super(BallDetector, self).__init__()
         self.config = config
-
         block1_c = 8
         self.block1 = torch.nn.Sequential(torch.nn.Conv2d(in_channels=3, out_channels=block1_c, kernel_size=5, stride=2),
                                           torch.nn.BatchNorm2d(num_features=block1_c),
@@ -73,16 +72,32 @@ class BallDetector(torch.nn.Module):
         self.out1_2_shape = (int((self.out1_1_shape[0] - 3 + 1) / 2), int((self.out1_1_shape[1] - 3 + 1) / 2))
 
         # TODO: change this method to multi-threading
-        out_tensor = torch.zeros(size=torch.Size([x.shape[0], x.shape[1], self.out1_2_shape[0], self.out1_2_shape[1]]))
+        out_tensor = torch.zeros(size=torch.Size([x.shape[0], 2, self.out1_2_shape[0], self.out1_2_shape[1]])).detach()
+        out_tensor.to(device="cuda:0")
+
+        i_h, i_w = 0, 0
         for start_row_idx, end_row_idx, start_col_idx, end_col_idx in divide_input_to_patches(x_shape=list(x.shape),
                                                                                               config=self.config):
-            patch_out = self.feed_forward(input=x[:, :, start_row_idx:end_row_idx, start_col_idx:end_col_idx])
-            # TODO: think to add logic to sync patches outputs
-            out_tensor[:, :, start_row_idx:end_row_idx, start_col_idx:end_col_idx] = patch_out
+            patch_out = self.feed_forward(X=x[:, :, start_row_idx:end_row_idx, start_col_idx:end_col_idx])
+            if int(patch_out.shape[2] * (1 + (i_h / 2))) <= out_tensor.shape[2]:
+                p_h_start, p_h_end = i_h * int(patch_out.shape[2] / 2), int(patch_out.shape[2] * (1 + (i_h / 2)))
+            else:
+                p_h_start, p_h_end = -patch_out.shape[2], out_tensor.shape[2]
+            if int(patch_out.shape[3] * (1 + (i_w / 2))) <= out_tensor.shape[3]:
+                p_w_start, p_w_end = i_w * int(patch_out.shape[3] / 2), int(patch_out.shape[3] * (1 + (i_w / 2)))
+            else:
+                p_w_start, p_w_end = -patch_out.shape[3], out_tensor.shape[3]
+                i_h += 1
+                i_w = -1
+            i_w += 1
+            out_tensor[:, :, p_h_start:p_h_end, p_w_start:p_w_end] = patch_out.data
+
+        softmax = torch.nn.Softmax(dim=1)
+        softmax(out_tensor)
         return out_tensor
 
-    def feed_forward(self, input):
-        out_1 = self.block1(input)
+    def feed_forward(self, X):
+        out_1 = self.block1(X)
         out_2 = self.block2(out_1)
         out_3 = self.block3(out_2)
 

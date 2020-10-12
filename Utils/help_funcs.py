@@ -44,14 +44,16 @@ def divide_input_to_patches(x_shape, config):
             if row_end_idx == x_shape[2]:
                 break_flag = True
             elif row_end_idx + int(patch_h / 2) > x_shape[2]:
-                stride_h = row_end_idx + int(patch_h / 2) - x_shape[2]
-                row_start_idx, row_end_idx = row_start_idx + stride_h, row_end_idx + stride_h
+                # stride_h = row_end_idx + int(patch_h / 2) - x_shape[2]
+                # row_start_idx, row_end_idx = row_start_idx + stride_h, row_end_idx + stride_h
+                row_start_idx, row_end_idx = -patch_h, x_shape[2]
             else:
                 row_start_idx, row_end_idx = row_start_idx + int(patch_h / 2), row_end_idx + int(patch_h / 2)
 
         elif col_end_idx + int(patch_w / 2) > x_shape[3]:  # stride will be smaller than patch_w / 2
-            stride_w = col_end_idx + int(patch_w / 2) - x_shape[3]
-            col_start_idx, col_end_idx = col_start_idx - stride_w, col_end_idx - stride_w
+            # stride_w = col_end_idx + int(patch_w / 2) - x_shape[3]
+            # col_start_idx, col_end_idx = col_start_idx - stride_w, col_end_idx - stride_w
+            col_start_idx, col_end_idx = -patch_w, x_shape[3]
         else:
             col_start_idx, col_end_idx = col_start_idx + int(patch_w / 2), col_end_idx + int(patch_w / 2)
 
