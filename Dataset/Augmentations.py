@@ -5,6 +5,8 @@ import cv2
 def random_crop(image, gt_image, out_width, out_height, p=0.5):
     """Randomly cropping augmentation. The cropping executes around the ball blob location."""
     if np.random.uniform() > p:
+        image = cv2.resize(src=image, dsize=(out_width, out_height))
+        gt_image = cv2.resize(src=gt_image, dsize=(out_width, out_height))
         return {'image': image, 'gt': gt_image}
     else:
         # find center of ball's blob:

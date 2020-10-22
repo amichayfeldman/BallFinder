@@ -41,7 +41,7 @@ class BallDetector(torch.nn.Module):
                                           torch.nn.MaxPool2d(kernel_size=2))
 
         # self.upsample2 = torch.nn.ConvTranspose2d(in_channels=16, out_channels=16, kernel_size=2)
-        self.upsample2 = torch.nn.Upsample(scale_factor=2, mode='bicubic')
+        # self.upsample2 = torch.nn.Upsample(scale_factor=2, mode='bicubic')
 
         block3_c = 32
         self.block3 = torch.nn.Sequential(torch.nn.Conv2d(in_channels=block2_c, out_channels=block3_c, kernel_size=3,
@@ -53,7 +53,7 @@ class BallDetector(torch.nn.Module):
                                           torch.nn.MaxPool2d(kernel_size=2))
 
         # self.upsample3 = torch.nn.ConvTranspose2d(in_channels=32, out_channels=32, kernel_size=4)
-        self.upsample3 = torch.nn.Upsample(size=(62, 62), mode='bicubic')
+        # self.upsample3 = torch.nn.Upsample(scale_factor=2, mode='bicubic')
 
         block4_c = block1_c + block2_c + block3_c
         self.block4 = torch.nn.Sequential(torch.nn.Conv2d(in_channels=block4_c, out_channels=block4_c, kernel_size=3,
@@ -72,7 +72,7 @@ class BallDetector(torch.nn.Module):
         self.out1_2_shape = (int((self.out1_1_shape[0] - 3 + 1) / 2), int((self.out1_1_shape[1] - 3 + 1) / 2))
 
         # TODO: change this method to multi-threading
-        out_tensor = torch.zeros(size=torch.Size([x.shape[0], 2, self.out1_2_shape[0], self.out1_2_shape[1]])).detach()
+        out_tensor = torch.zeros(size=torch.Size([x.shape[0], 2, self.out1_2_shape[0], self.out1_2_shape[1]]))
         out_tensor.to(device="cuda:0")
 
         i_h, i_w = 0, 0
@@ -90,7 +90,7 @@ class BallDetector(torch.nn.Module):
                 i_h += 1
                 i_w = -1
             i_w += 1
-            out_tensor[:, :, p_h_start:p_h_end, p_w_start:p_w_end] = patch_out.data
+            out_tensor[:, :, p_h_start:p_h_end, p_w_start:p_w_end] = patch_out
 
         # softmax = torch.nn.Softmax(dim=1)
         # output = softmax(out_tensor)
@@ -101,8 +101,10 @@ class BallDetector(torch.nn.Module):
         out_2 = self.block2(out_1)
         out_3 = self.block3(out_2)
 
-        upsampled_out2 = self.upsample2(out_2)
-        upsampled_out3 = self.upsample3(out_3)
+        upsampling_layer = torch.nn.Upsample(size=(out_1.shape[2], out_1.shape[3]), mode='bicubic')
+
+        upsampled_out2 = upsampling_layer(out_2)
+        upsampled_out3 = upsampling_layer(out_3)
 
         concatenated = torch.cat((out_1, upsampled_out2, upsampled_out3), dim=1)
         out_4 = self.block4(concatenated)

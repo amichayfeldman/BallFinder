@@ -63,4 +63,4 @@ def dice_loss(output, target, ignore_index=None):
     denominator = denominator.sum(0).sum(1).sum(1)
     loss = 1 - (numerator / denominator)
 
-    return loss.sum() / loss.size(0)
+    return torch.autograd.Variable(loss.sum() / loss.size(0))

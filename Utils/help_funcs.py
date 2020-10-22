@@ -4,12 +4,16 @@ import glob
 import cv2
 from pathlib import Path
 import math
+from itertools import zip_longest
 
 
-def write_to_csv(csv_path, list_to_write):
+def write_to_csv(csv_path, lists):
+    export_data = zip_longest(*lists, encoding="ISO-8859-1", newline='')
     with open(csv_path, 'w') as file:
-        wr = csv.writer(file, quoting=csv.QUOTE_ALL)
-        wr.writerow(list_to_write)
+        wr = csv.writer(file)
+        wr.writerow(("Epoch", "Train_loss", "Val_loss", "lr", "wd"))
+        wr.writerow(export_data)
+    file.close()
 
 
 def convert_png_folder_to_jpg(input_folder_path):
@@ -35,7 +39,7 @@ def divide_input_to_patches(x_shape, config):
     break_flag = False
     while not break_flag:
         if x_shape[2] <= patch_h or x_shape[3] <= patch_w:
-            yield row_start_idx, row_end_idx, col_start_idx, col_end_idx
+            yield 0, x_shape[2], 0, x_shape[3]
             break_flag = True
 
         # print(row_start_idx, "",  row_end_idx, "", col_start_idx, "",  col_end_idx)

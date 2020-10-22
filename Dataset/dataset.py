@@ -15,7 +15,7 @@ sometimes = lambda aug: iaa.Sometimes(0.5, aug)
 
 
 class BallDataset(torch.utils.data.Dataset):
-    def __init__(self, images_list, gt_list, img_h, img_w, mode='train'):
+    def __init__(self, images_list, gt_list, basic_res_w, basic_res_h, img_h, img_w, mode='train'):
         self.data = pd.DataFrame(columns=['img_path', 'gt_path'])
         self.data['img_path'] = images_list
         self.gt_imgs_list = gt_list
@@ -24,6 +24,7 @@ class BallDataset(torch.utils.data.Dataset):
         self.data.reset_index(drop=True, inplace=True)
 
         self.img_w, self.img_h = img_w, img_h
+        self.basic_res_w, self.basic_res_h = basic_res_w, basic_res_h
         self.mode = mode
 
     def assign_gt_to_img(self, row):
@@ -40,15 +41,17 @@ class BallDataset(torch.utils.data.Dataset):
         return len(self.data)
 
     def change_img_size(self):
-        random_w_power = torch.randint(8, np.log2(1280))
-        random_h_power = torch.randint(8, np.log2(720))
-        self.img_w, self.img_h = 2**random_w_power, 2**random_h_power
+        random_w = np.random.randint(low=256, high=1280, size=(1,))[0]
+        random_h = np.random.randint(low=int(random_w / 3), high=np.min(np.array([random_w, 720])), size=(1,))[0]
+        self.img_w, self.img_h = random_w, random_h
 
     def __getitem__(self, idx):
         row = self.data.iloc[idx]
         image = cv2.imread(row['img_path'])
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = cv2.resize(src=image, dsize=(self.basic_res_w, self.basic_res_h))
         gt_mask = cv2.imread(row['gt_path'], cv2.IMREAD_GRAYSCALE)
+        gt_mask = cv2.resize(src=gt_mask, dsize=(self.basic_res_w, self.basic_res_h))
         gt_mask[gt_mask > 0] = 1
 
         if self.mode == 'test':
@@ -77,7 +80,7 @@ class BallDataset(torch.utils.data.Dataset):
             return sample
 
 
-def get_dataloaders(dataset_dict, gt_dict, batch_size, num_workers, shuffle=True):
+def get_dataloaders(dataset_dict, gt_dict, batch_size, num_workers, config, shuffle=True):
     """
     Get train, val and test dataloaders of Ballfinder.
     :param dataset_dict: Dict. Paths for dataset input images with structure of
@@ -92,7 +95,9 @@ def get_dataloaders(dataset_dict, gt_dict, batch_size, num_workers, shuffle=True
     print("# - # - # - # - # - # - # - # - # - # - # - # - # - #")
     if 'train' in dataset_dict:
         print("Building train set", end="")
-        train_set = BallDataset(dataset_dict['train'], gt_dict['train'], img_h=720, img_w=1280, mode='train')
+        train_set = BallDataset(dataset_dict['train'], gt_dict['train'],
+                                basic_res_h=config.getint('Params', 'basic_res_h'),
+                                basic_res_w=config.getint('Params', 'basic_res_w'), img_h=720, img_w=1280, mode='train')
         print("...")
         train_dataloader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=shuffle,
                                                        num_workers=num_workers)
@@ -102,7 +107,9 @@ def get_dataloaders(dataset_dict, gt_dict, batch_size, num_workers, shuffle=True
 
     if 'val' in dataset_dict:
         print("Building val set", end="")
-        val_set = BallDataset(dataset_dict['val'], gt_dict['val'], img_h=720, img_w=1280, mode='val')
+        val_set = BallDataset(dataset_dict['val'], gt_dict['val'],
+                              basic_res_h=config.getint('Params', 'basic_res_h'),
+                              basic_res_w=config.getint('Params', 'basic_res_w'), img_h=720, img_w=1280, mode='val')
         print("...")
         val_dataloader = torch.utils.data.DataLoader(val_set, batch_size=batch_size, shuffle=shuffle,
                                                        num_workers=num_workers)
@@ -112,7 +119,9 @@ def get_dataloaders(dataset_dict, gt_dict, batch_size, num_workers, shuffle=True
 
     if 'test' in dataset_dict:
         print("Building val set", end="")
-        test_set = BallDataset(dataset_dict['test'], gt_dict['test'], img_h=720, img_w=1280, mode='test')
+        test_set = BallDataset(dataset_dict['test'], gt_dict['test'],
+                               basic_res_h=config.getint('Params', 'basic_res_h'),
+                               basic_res_w=config.getint('Params', 'basic_res_w'), img_h=720, img_w=1280, mode='test')
         print("...")
         test_dataloader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False,
                                                        num_workers=num_workers)
