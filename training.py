@@ -29,7 +29,7 @@ def save_model(model, epoch, output_path, best=False):
 
 
 def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optimizer, scheduler, output_path,
-          alpha):
+          alpha, save_model=True, write_csv=True):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     assert device.type == 'cuda', "Cuda is not working"
 
@@ -94,21 +94,23 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
         # --- Save model checkpoint ---#
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            save_model(model=model, epoch=epoch, output_path=os.path.join(output_path, 'saved_checkpoints'), best=True)
-        elif epoch % 10:
-            save_model(model=model, epoch=epoch, output_path=os.path.join(output_path, 'saved_checkpoints'), best=False)
+            if save_model:
+                save_model(model=model, epoch=epoch, output_path=os.path.join(output_path, 'saved_checkpoints'), best=True)
+        elif epoch % 10 == 0:
+            if save_model:
+                save_model(model=model, epoch=epoch, output_path=os.path.join(output_path, 'saved_checkpoints'), best=False)
         ###############################
-
-        scheduler.step(val_loss)
+        if scheduler is not None:
+            scheduler.step(val_loss)
         train_dataloader.dataset.change_img_size()
         val_dataloader.dataset.change_img_size()
 
         #  PRINT:  #
         print("Epoch {}:  train loss: {:.5f}, val loss: {:.5f}".format(epoch, train_loss, val_loss))
-
-    write_to_csv(os.path.join(output_path, 'results.csv'), [list(range(epochs)), train_loss_list, val_loss_list,
+    if write_csv:
+        write_to_csv(os.path.join(output_path, 'results.csv'), [list(range(epochs)), train_loss_list, val_loss_list,
                                                             lr_list, wd_list])
-    return train_loss, best_val_loss  # return last train loss and the best val loss
+    return train_loss_list, val_loss_list  # return last train loss and the best val loss
 
 
 def main():
@@ -158,7 +160,7 @@ def main():
     # --- send training --- #
     train(model=model, train_dataloader=train_dataloader, val_dataloader=val_dataloader, epochs=epochs,
           criterion_loss=focal_loss, optimizer=optimizer, scheduler=scheduler, output_path=output_folder,
-          alpha=alpha)
+          alpha=alpha, save_model=True)
 
 
 if __name__ == '__main__':

@@ -112,7 +112,7 @@ def get_dataloaders(dataset_dict, gt_dict, batch_size, num_workers, config, shuf
                               basic_res_w=config.getint('Params', 'basic_res_w'), img_h=720, img_w=1280, mode='val')
         print("...")
         val_dataloader = torch.utils.data.DataLoader(val_set, batch_size=batch_size, shuffle=shuffle,
-                                                       num_workers=num_workers)
+                                                     num_workers=num_workers)
         print("Finished the val dataloader building")
     else:
         val_dataloader = None
@@ -124,7 +124,7 @@ def get_dataloaders(dataset_dict, gt_dict, batch_size, num_workers, config, shuf
                                basic_res_w=config.getint('Params', 'basic_res_w'), img_h=720, img_w=1280, mode='test')
         print("...")
         test_dataloader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False,
-                                                       num_workers=num_workers)
+                                                      num_workers=num_workers)
         print("Finished the test dataloader building")
     else:
         test_dataloader = None

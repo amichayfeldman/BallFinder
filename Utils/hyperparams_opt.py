@@ -8,18 +8,22 @@ import os
 from ..Dataset.dataset import get_dataloaders
 from ..training import train
 from ..Model.Model import BallDetector, init_weights
+import pandas as pd
 
 
 def train_bayesian(parameterization):
     net = BallDetector()
     net.apply(init_weights)
-    lr, wd = parameterization
-    optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=wd)
+    lr, w_d = parameterization
+    optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=w_d)
 
-    last_train_loss, best_val_loss = train(model=net, train_dataloader=train_dataloader, val_dataloader=val_dataloader,
+    train_loss_list, val_loss_list = train(model=net, train_dataloader=train_dataloader, val_dataloader=val_dataloader,
                                            epochs=epochs, criterion_loss=loss, optimizer=optimizer, scheduler=None,
-                                           output_path=output_folder, alpha=1, save_model=False)
-    return {"train_loss": last_train_loss}
+                                           output_path=output_folder, alpha=1, save_model=False, write_csv=False)
+    min_train_loss = min(train_loss_list)
+    results.append({'Epoch': list(range(len(train_loss_list))), 'train_loss': min_train_loss,
+                    'val_loss': val_loss_list[train_loss_list == min_train_loss], 'lr': lr, 'wd': w_d})
+    return {"train_loss": min(train_loss_list)}
 
 
 def bayesian_opt_main():
@@ -57,3 +61,9 @@ if __name__ == '__main__':
                                                           batch_size=batch_size, num_workers=0, config=config)
     output_folder = config['Paths']['output_folder']
     loss = None
+
+    # results = pd.DataFrame(columns=['Epoch', 'train_loss', 'val_loss', 'lr', 'wd'])
+    results = []
+    bayesian_opt_main()
+    results_df = pd.DataFrame(results)
+    results_df.to_csv(os.path.join(output_folder, 'bayesian_opt_results.csv'))
