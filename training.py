@@ -7,7 +7,7 @@ import configparser
 from Dataset.dataset import get_dataloaders
 from Model.Model import BallDetector, init_weights
 import torch.nn as nn
-from Utils.Losses import FocalLoss, dice_loss
+from Utils.Losses import FocalLoss, dice_loss, DiceLoss
 import cv2
 
 torch.backends.cudnn.deterministic = True
@@ -17,7 +17,7 @@ torch.cuda.manual_seed_all(3)
 np.random.seed(2)
 
 
-def save_model(model, epoch, output_path, best=False):
+def save_model_checkpoint(model, epoch, output_path, best=False):
     if best:
         previous_best_pt = glob.glob(os.path.join(output_path, '*BEST.pt'))
         if len(previous_best_pt) > 0:
@@ -52,12 +52,13 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
                                                              scale_factor=(outputs.shape[2] / labels.shape[1],
                                                              outputs.shape[3] / labels.shape[2]), mode='bicubic')
             sampled_labels[sampled_labels != 0] = 1
+            one_hot_target = (torch.arange(2).cuda() == sampled_labels[..., None]).type(torch.int64).permute(0, 3, 1, 2)
             ce_loss = criterion_loss(outputs.cuda(), sampled_labels.squeeze().cuda().long())
-            # dice_score = dice_loss(output=outputs.cuda(), target=sampled_labels.squeeze().cuda().long())
-            # loss = alpha * ce_loss + (1 - alpha) * torch.autograd.Variable(dice_score, requires_grad=True)
-            ce_loss.backward()
+            dice_score = dice(predict=outputs.cuda(), target=one_hot_target.squeeze().cuda().long())
+            loss = alpha * ce_loss + (1 - alpha) * dice_score
+            loss.backward()
             optimizer.step()
-            running_loss += ce_loss.item()
+            running_loss += loss.item()
         train_loss = running_loss / (i + 1)
         train_loss_list.append(train_loss)
         ##################
@@ -74,10 +75,12 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
                                                                                outputs.shape[3] / labels.shape[2]),
                                                                  mode='bicubic')
                 sampled_labels[sampled_labels != 0] = 1
+                one_hot_target = (torch.arange(2).cuda() ==
+                                  sampled_labels[..., None]).type(torch.int64).permute(0, 3, 1, 2)
                 ce_loss = criterion_loss(outputs.cuda(), sampled_labels.squeeze().cuda().long())
-                # dice_score = dice_loss(output=outputs.cuda(), target=sampled_labels.squeeze().cuda().long())
-                # loss = alpha * ce_loss + (1 - alpha) * dice_score
-                val_running_loss += ce_loss.item()
+                dice_score = dice(predict=outputs.cuda(), target=one_hot_target.squeeze().cuda().long())
+                loss = alpha * ce_loss + (1 - alpha) * dice_score
+                val_running_loss += loss.item()
             val_loss = val_running_loss / (val_i + 1)
             val_loss_list.append(val_loss)
         ##################
@@ -95,12 +98,12 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             if save_model:
-                save_model(model=model, epoch=epoch, output_path=os.path.join(output_path, 'saved_checkpoints'),
-                           best=True)
+                save_model_checkpoint(model=model, epoch=epoch,
+                                      output_path=os.path.join(output_path, 'saved_checkpoints'), best=True)
         elif epoch % 10 == 0:
             if save_model:
-                save_model(model=model, epoch=epoch, output_path=os.path.join(output_path, 'saved_checkpoints'),
-                           best=False)
+                save_model_checkpoint(model=model, epoch=epoch,
+                                      output_path=os.path.join(output_path, 'saved_checkpoints'), best=False)
         ###############################
         if scheduler is not None:
             scheduler.step(val_loss)
@@ -166,4 +169,5 @@ def main():
 
 
 if __name__ == '__main__':
+    dice = DiceLoss()
     main()
