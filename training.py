@@ -95,10 +95,12 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             if save_model:
-                save_model(model=model, epoch=epoch, output_path=os.path.join(output_path, 'saved_checkpoints'), best=True)
+                save_model(model=model, epoch=epoch, output_path=os.path.join(output_path, 'saved_checkpoints'),
+                           best=True)
         elif epoch % 10 == 0:
             if save_model:
-                save_model(model=model, epoch=epoch, output_path=os.path.join(output_path, 'saved_checkpoints'), best=False)
+                save_model(model=model, epoch=epoch, output_path=os.path.join(output_path, 'saved_checkpoints'),
+                           best=False)
         ###############################
         if scheduler is not None:
             scheduler.step(val_loss)
@@ -109,7 +111,7 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
         print("Epoch {}:  train loss: {:.5f}, val loss: {:.5f}".format(epoch, train_loss, val_loss))
     if write_csv:
         write_to_csv(os.path.join(output_path, 'results.csv'), [list(range(epochs)), train_loss_list, val_loss_list,
-                                                            lr_list, wd_list])
+                                                                lr_list, wd_list])
     return train_loss_list, val_loss_list  # return last train loss and the best val loss
 
 
