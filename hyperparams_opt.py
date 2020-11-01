@@ -39,15 +39,19 @@ def bayesian_opt_main():
     best_parameters = optimize(
         parameters=[
             {"name": "lr", "type": "range", "bounds": [1e-5, 1e-2]},
-            {"name": "wd", "type": "range", "bounds": [1e-6, 1e-2]},
+            {"name": "wd", "type": "range", "bounds": [1e-7, 1e-2]},
         ],
         evaluation_function=train_bayesian,
         objective_name='train_loss',
         minimize=True,
         total_trials=40
     )
-    # print("Best Params:")
-    # print("lr:{}, wd:{}".format(best_parameters['lr'], best_parameters['wd']))
+
+    results_df = pd.DataFrame(results)
+    results_df.to_csv(os.path.join(output_folder, 'bayesian_opt_results.csv'))
+
+    print("Best Params:")
+    print("lr:{}, wd:{}".format(best_parameters['lr'], best_parameters['wd']))
 
 
 def read_results(csv_path):
@@ -75,9 +79,9 @@ if __name__ == '__main__':
     val_gt = glob.glob(os.path.join(config['ground_truth']['val'], '*/*/*.png'))
     datasets_imgs_folders = {'train': train_images, 'val': val_images}
     gt_imgs_folders = {'train': train_gt, 'val': val_gt}
-    # train_dataloader, val_dataloader, _ = get_dataloaders(dataset_dict=datasets_imgs_folders,
-    #                                                       gt_dict=gt_imgs_folders,
-    #                                                       batch_size=batch_size, num_workers=0, config=config)
+    train_dataloader, val_dataloader, _ = get_dataloaders(dataset_dict=datasets_imgs_folders,
+                                                          gt_dict=gt_imgs_folders,
+                                                          batch_size=batch_size, num_workers=0, config=config)
     output_folder = config['Paths']['output_folder']
     if not os.path.isdir(output_folder):
         os.makedirs(output_folder)
@@ -85,8 +89,7 @@ if __name__ == '__main__':
 
     # results = pd.DataFrame(columns=['Epoch', 'train_loss', 'val_loss', 'lr', 'wd'])
     results = []
-    # bayesian_opt_main()
-    results_df = pd.DataFrame(results)
-    results_df.to_csv(os.path.join(output_folder, 'bayesian_opt_results.csv'))
+    bayesian_opt_main()
 
-    read_results(csv_path='/home/amichay/DL/BallDetector/Runnings/22_Oct_BO/bayesian_opt_results.csv')
+
+    # read_results(csv_path='/home/amichay/DL/BallDetector/Runnings/22_Oct_BO/bayesian_opt_results.csv')

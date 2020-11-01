@@ -24,20 +24,24 @@ class BallDetector(torch.nn.Module):
     def __init__(self, config):
         super(BallDetector, self).__init__()
         self.config = config
-        block1_c = 8
+        block1_c = 16
         self.block1 = torch.nn.Sequential(torch.nn.Conv2d(in_channels=3, out_channels=block1_c, kernel_size=5, stride=2),
                                           torch.nn.BatchNorm2d(num_features=block1_c),
+                                          torch.nn.ReLU(inplace=True),
                                           torch.nn.Conv2d(in_channels=block1_c, out_channels=block1_c, kernel_size=3),
                                           torch.nn.BatchNorm2d(num_features=block1_c),
+                                          torch.nn.ReLU(inplace=True),
                                           torch.nn.MaxPool2d(kernel_size=2))
 
         block2_c = 16
         self.block2 = torch.nn.Sequential(torch.nn.Conv2d(in_channels=block1_c, out_channels=block2_c, kernel_size=3,
                                                           padding=1),
                                           torch.nn.BatchNorm2d(num_features=block2_c),
+                                          torch.nn.ReLU(inplace=True),
                                           torch.nn.Conv2d(in_channels=block2_c, out_channels=block2_c, kernel_size=3,
                                                           padding=1),
                                           torch.nn.BatchNorm2d(num_features=block2_c),
+                                          torch.nn.ReLU(inplace=True),
                                           torch.nn.MaxPool2d(kernel_size=2))
 
         # self.upsample2 = torch.nn.ConvTranspose2d(in_channels=16, out_channels=16, kernel_size=2)
@@ -47,9 +51,11 @@ class BallDetector(torch.nn.Module):
         self.block3 = torch.nn.Sequential(torch.nn.Conv2d(in_channels=block2_c, out_channels=block3_c, kernel_size=3,
                                                           padding=1),
                                           torch.nn.BatchNorm2d(num_features=block3_c),
+                                          torch.nn.ReLU(inplace=True),
                                           torch.nn.Conv2d(in_channels=block3_c, out_channels=block3_c, kernel_size=3,
                                                           padding=1),
                                           torch.nn.BatchNorm2d(num_features=block3_c),
+                                          torch.nn.ReLU(inplace=True),
                                           torch.nn.MaxPool2d(kernel_size=2))
 
         # self.upsample3 = torch.nn.ConvTranspose2d(in_channels=32, out_channels=32, kernel_size=4)
@@ -59,6 +65,7 @@ class BallDetector(torch.nn.Module):
         self.block4 = torch.nn.Sequential(torch.nn.Conv2d(in_channels=block4_c, out_channels=block4_c, kernel_size=3,
                                                           padding=1),
                                           torch.nn.BatchNorm2d(num_features=block4_c),
+                                          torch.nn.ReLU(inplace=True),
                                           torch.nn.Conv2d(in_channels=block4_c, out_channels=2, kernel_size=3,
                                                           padding=1))
 
@@ -101,7 +108,7 @@ class BallDetector(torch.nn.Module):
         out_2 = self.block2(out_1)
         out_3 = self.block3(out_2)
 
-        upsampling_layer = torch.nn.Upsample(size=(out_1.shape[2], out_1.shape[3]), mode='bicubic')
+        upsampling_layer = torch.nn.Upsample(size=(out_1.shape[2], out_1.shape[3]), mode='bicubic', align_corners=True)
 
         upsampled_out2 = upsampling_layer(out_2)
         upsampled_out3 = upsampling_layer(out_3)

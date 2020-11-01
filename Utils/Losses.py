@@ -105,6 +105,8 @@ class BinaryDiceLoss(torch.nn.Module):
         self.reduction = reduction
 
     def forward(self, predict, target):
+        if predict.shape[0] == 1:
+            predict = torch.squeeze(predict, 0)
         assert predict.shape[0] == target.shape[0], "predict & target batch size don't match"
         predict = predict.contiguous().view(predict.shape[0], -1)
         target = target.contiguous().view(target.shape[0], -1)
@@ -142,6 +144,10 @@ class DiceLoss(torch.nn.Module):
         self.ignore_index = ignore_index
 
     def forward(self, predict, target):
+        if predict.shape[0] == 1:
+            predict = torch.squeeze(predict, 0)
+        if predict.shape != target.shape:
+            print("predict shape={}, target shape={}".format(predict.shape, target.shape))
         assert predict.shape == target.shape, 'predict & target shape do not match'
         dice = BinaryDiceLoss(**self.kwargs)
         total_loss = 0

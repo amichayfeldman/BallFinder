@@ -9,12 +9,15 @@ from Model.Model import BallDetector, init_weights
 import torch.nn as nn
 from Utils.Losses import FocalLoss, dice_loss, DiceLoss
 import cv2
+import pandas as pd
 
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 torch.manual_seed(1)
 torch.cuda.manual_seed_all(3)
 np.random.seed(2)
+
+dice = DiceLoss()
 
 
 def save_model_checkpoint(model, epoch, output_path, best=False):
@@ -35,24 +38,30 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
 
     train_loss_list, val_loss_list, lr_list, wd_list = [], [], [], []
     best_train_loss, best_val_loss = np.inf, np.inf
-    if not os.path.isdir(os.path.join(output_path, 'saved_checkpoints')):
-        os.makedirs(os.path.join(output_path, 'saved_checkpoints'))
 
-    model.train()
+    initial_lr = optimizer.param_groups[-1]['lr']
+    initial_wd = optimizer.param_groups[-1]['weight_decay']
+    folder_name = 'saved_checkpoints_lr={}_wd={}'.format(initial_lr, initial_wd)
+
+    if save_model and not os.path.isdir(os.path.join(output_path, folder_name)):
+        os.makedirs(os.path.join(output_path, folder_name))
+
     model.to(device)
 
     for epoch in range(epochs):
         running_loss = 0.0
         # --- TRAIN:  --- #
+        model.train()
         for i, data in enumerate(train_dataloader):
             inputs, labels = data['image'].to(device), data['gt'].to(device)
             optimizer.zero_grad()
             outputs = model(inputs.type(torch.FloatTensor).to(device))
             sampled_labels = torch.nn.functional.interpolate(labels.type(torch.FloatTensor).unsqueeze(1),
-                                                             scale_factor=(outputs.shape[2] / labels.shape[1],
-                                                             outputs.shape[3] / labels.shape[2]), mode='bicubic')
+                                                             size=outputs.shape[2:], mode='bicubic',
+                                                             align_corners=False)
             sampled_labels[sampled_labels != 0] = 1
-            one_hot_target = (torch.arange(2).cuda() == sampled_labels[..., None]).type(torch.int64).permute(0, 3, 1, 2)
+            one_hot_target = (torch.arange(2).cuda() == sampled_labels[..., None].cuda()).type(torch.int64).\
+                squeeze(1).permute(0, 3, 1, 2)
             ce_loss = criterion_loss(outputs.cuda(), sampled_labels.squeeze().cuda().long())
             dice_score = dice(predict=outputs.cuda(), target=one_hot_target.squeeze().cuda().long())
             loss = alpha * ce_loss + (1 - alpha) * dice_score
@@ -71,12 +80,11 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
                 inputs, labels = val_data['image'].to(device), val_data['gt'].to(device)
                 outputs = model(inputs.type(torch.FloatTensor).to(device))
                 sampled_labels = torch.nn.functional.interpolate(labels.type(torch.FloatTensor).unsqueeze(1),
-                                                                 scale_factor=(outputs.shape[2] / labels.shape[1],
-                                                                               outputs.shape[3] / labels.shape[2]),
-                                                                 mode='bicubic')
+                                                                 size=outputs.shape[2:], mode='bicubic',
+                                                                 align_corners=False)
                 sampled_labels[sampled_labels != 0] = 1
-                one_hot_target = (torch.arange(2).cuda() ==
-                                  sampled_labels[..., None]).type(torch.int64).permute(0, 3, 1, 2)
+                one_hot_target = (torch.arange(2).cuda() == sampled_labels[..., None].cuda()).type(torch.int64). \
+                    squeeze(1).permute(0, 3, 1, 2)
                 ce_loss = criterion_loss(outputs.cuda(), sampled_labels.squeeze().cuda().long())
                 dice_score = dice(predict=outputs.cuda(), target=one_hot_target.squeeze().cuda().long())
                 loss = alpha * ce_loss + (1 - alpha) * dice_score
@@ -99,22 +107,24 @@ def train(model, train_dataloader, val_dataloader, epochs, criterion_loss, optim
             best_val_loss = val_loss
             if save_model:
                 save_model_checkpoint(model=model, epoch=epoch,
-                                      output_path=os.path.join(output_path, 'saved_checkpoints'), best=True)
+                                      output_path=os.path.join(output_path, folder_name), best=True)
         elif epoch % 10 == 0:
             if save_model:
                 save_model_checkpoint(model=model, epoch=epoch,
-                                      output_path=os.path.join(output_path, 'saved_checkpoints'), best=False)
+                                      output_path=os.path.join(output_path, folder_name), best=False)
         ###############################
         if scheduler is not None:
             scheduler.step(val_loss)
-        train_dataloader.dataset.change_img_size()
-        val_dataloader.dataset.change_img_size()
+        if epoch > 20:
+            train_dataloader.dataset.change_img_size()
+            val_dataloader.dataset.change_img_size()
 
         #  PRINT:  #
         print("Epoch {}:  train loss: {:.5f}, val loss: {:.5f}".format(epoch, train_loss, val_loss))
     if write_csv:
-        write_to_csv(os.path.join(output_path, 'results.csv'), [list(range(epochs)), train_loss_list, val_loss_list,
-                                                                lr_list, wd_list])
+        # write_to_csv(os.path.join(output_path, 'results.csv'), [list(range(epochs)), train_loss_list, val_loss_list,
+        #                                                         lr_list, wd_list])
+        results.append({'train_loss': train_loss_list, 'val_loss': val_loss_list, 'lr': lr_list, 'wd': wd_list})
     return train_loss_list, val_loss_list  # return last train loss and the best val loss
 
 
@@ -144,30 +154,35 @@ def main():
                                                           gt_dict=gt_imgs_folders,
                                                           batch_size=batch_size, num_workers=0, config=config)
     #####################
+    for l_r in [lr, 1e-2, 1e-3, 1e-4]:
+        for w_d in [wd, 1e-7, 1e-6, 1e-5, 1e-3]:
+            # --- Model --- #
+            checkpoint = config['Paths']['model_checkpoint']
+            if len(checkpoint) > 0:
+                model = BallDetector(config=config)
+                model.load_state_dict(torch.load(checkpoint))
+            else:
+                model = BallDetector(config=config)
+                model.apply(init_weights)
+            #####################
 
-    # --- Model --- #
-    checkpoint = config['Paths']['model_checkpoint']
-    if len(checkpoint) > 0:
-        model = BallDetector(config=config)
-        model.load_state_dict(torch.load(checkpoint))
-    else:
-        model = BallDetector(config=config)
-        model.apply(init_weights)
-    #####################
+            # --- Loss function --- #
+            loss_bce = nn.BCELoss()
+            focal_loss = FocalLoss(gamma=2, alpha=1)
+            optimizer = torch.optim.Adam(model.parameters(), lr=l_r, weight_decay=w_d)
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=10)
+            #########################
 
-    # --- Loss function --- #
-    loss_bce = nn.BCELoss()
-    focal_loss = FocalLoss(gamma=2, alpha=1)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=wd)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=10)
-    #########################
+            # --- send training --- #
+            train(model=model, train_dataloader=train_dataloader, val_dataloader=val_dataloader, epochs=epochs,
+                  criterion_loss=focal_loss, optimizer=optimizer, scheduler=scheduler, output_path=output_folder,
+                  alpha=alpha, save_model=True)
 
-    # --- send training --- #
-    train(model=model, train_dataloader=train_dataloader, val_dataloader=val_dataloader, epochs=epochs,
-          criterion_loss=focal_loss, optimizer=optimizer, scheduler=scheduler, output_path=output_folder,
-          alpha=alpha, save_model=True)
+    results_df = pd.DataFrame(results)
+    results_df.to_csv(os.path.join(output_folder, 'results.csv'))
 
 
 if __name__ == '__main__':
-    dice = DiceLoss()
+    results = []
+
     main()
