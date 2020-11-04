@@ -81,7 +81,7 @@ class BallDataset(torch.utils.data.Dataset):
             # tensored_gt = torch.from_numpy(after_crop['gt'])
             # sample = {'image': tensored_image.permute(2, 0, 1) // 255, 'gt': tensored_gt, 'idx': idx}
             sample = {'image': np.moveaxis(flipped_or_not['image'], -1, 0) / 255, 'gt': flipped_or_not['gt'],
-                      'idx': idx}
+                      'idx': idx, 'img_path': row['img_path']}
             return sample
 
 

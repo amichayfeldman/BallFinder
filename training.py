@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from Utils.help_funcs import write_to_csv
+from Utils.help_funcs import plot_dataloader
 import os
 import glob
 import configparser
@@ -140,6 +140,7 @@ def main():
     lr = config.getfloat('Params', 'lr')
     wd = config.getfloat('Params', 'wd')
     alpha = config.getfloat('Params', 'alpha')
+    plot_dl = config.getboolean('Params', 'plot_dataloaders')
     epochs = config.getint('Params', 'epochs')
     output_folder = config['Paths']['output_folder']
     if not os.path.isdir(output_folder):
@@ -157,6 +158,9 @@ def main():
     train_dataloader, val_dataloader, _ = get_dataloaders(dataset_dict=datasets_imgs_folders,
                                                           gt_dict=gt_imgs_folders,
                                                           batch_size=batch_size, num_workers=0, config=config)
+    if plot_dl:
+        plot_dataloader(dataloader=train_dataloader, output_folder=os.path.join(output_folder, 'dl_imgs_train'))
+        plot_dataloader(dataloader=val_dataloader, output_folder=os.path.join(output_folder, 'dl_imgs_val'))
     #####################
     # --- Model --- #
     checkpoint = config['Paths']['model_checkpoint']

@@ -4,6 +4,7 @@ from Utils.help_funcs import divide_input_to_patches
 import copy
 from.Model import init_weights
 
+
 class PreTrainedVggModel(torch.nn.Module):
     def __init__(self, config, device):
         super(PreTrainedVggModel, self).__init__()
@@ -23,7 +24,7 @@ class PreTrainedVggModel(torch.nn.Module):
                                            torch.nn.Conv2d(in_channels=32, out_channels=16, kernel_size=3),
                                            torch.nn.BatchNorm2d(num_features=16),
                                            torch.nn.ReLU(inplace=True),
-                                           torch.nn.Conv2d(in_channels=16, out_channels=2, kernel_size=1),
+                                           torch.nn.ConvTranspose2d(in_channels=16, out_channels=2, kernel_size=3, stride=2),
                                            )
 
     def feed_forward(self, x):
@@ -39,34 +40,23 @@ class PreTrainedVggModel(torch.nn.Module):
         # upsampled_out4 = upsampling_layer(out_4)
         concatenated = torch.cat((out_1, upsampled_out2, upsampled_out3), dim=1)
         out_5 = self.block_5(concatenated)
-        return out_5
+        out_sampling_layer = torch.nn.Upsample(size=(x.shape[2], x.shape[3]), mode='bicubic', align_corners=True)
+
+        return out_sampling_layer(out_5)
 
     def forward(self, X):
         # compute output tensor shape according to patch sizes and
         in_w, in_h = X.shape[3], X.shape[2]
-        out1_1_shape = (int(in_h - 3 + 2) + 1, int(in_w - 3 + 2) + 1)
-        out1_2_shape = (out1_1_shape[0] - 3 + 1, out1_1_shape[1] - 3 + 1)
 
         # TODO: change this method to multi-threading
-        out_tensor = torch.zeros(size=torch.Size([X.shape[0], 2, out1_2_shape[0], out1_2_shape[1]]))
+        out_tensor = torch.zeros(size=torch.Size([X.shape[0], 2, X.shape[2], X.shape[3]]))
         out_tensor.to(device="cuda:0")
 
         i_h, i_w = 0, 0
         for start_row_idx, end_row_idx, start_col_idx, end_col_idx in divide_input_to_patches(x_shape=list(X.shape),
                                                                                               config=self.config):
             patch_out = self.feed_forward(x=X[:, :, start_row_idx:end_row_idx, start_col_idx:end_col_idx].to(self.device))
-            if int(patch_out.shape[2] * (1 + (i_h / 2))) <= out_tensor.shape[2]:
-                p_h_start, p_h_end = i_h * int(patch_out.shape[2] / 2), int(patch_out.shape[2] * (1 + (i_h / 2)))
-            else:
-                p_h_start, p_h_end = -patch_out.shape[2], out_tensor.shape[2]
-            if int(patch_out.shape[3] * (1 + (i_w / 2))) <= out_tensor.shape[3]:
-                p_w_start, p_w_end = i_w * int(patch_out.shape[3] / 2), int(patch_out.shape[3] * (1 + (i_w / 2)))
-            else:
-                p_w_start, p_w_end = -patch_out.shape[3], out_tensor.shape[3]
-                i_h += 1
-                i_w = -1
-            i_w += 1
-            out_tensor[:, :, p_h_start:p_h_end, p_w_start:p_w_end] = patch_out
+            out_tensor[:, :, start_row_idx:end_row_idx, start_col_idx:end_col_idx] = patch_out
 
         # softmax = torch.nn.Softmax(dim=1)
         # output = softmax(out_tensor)
