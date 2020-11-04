@@ -51,14 +51,16 @@ def bayesian_opt_main():
     results_df.to_csv(os.path.join(output_folder, 'bayesian_opt_results.csv'))
 
     print("Best Params:")
-    print("lr:{}, wd:{}".format(best_parameters['lr'], best_parameters['wd']))
+    print("lr:{}, wd:{}".format(best_parameters[0]['lr'], best_parameters[0]['wd']))
 
 
 def read_results(csv_path):
     def attach_best_train_loss(row):
-        row['best_train_loss'] = min(row['train_loss'])
+        num_list = row['train_loss'][1:-1].split(',')
+        floats_list = [float(x.strip()) for x in num_list]
+        row['best_train_loss'] = min(floats_list)
         # calc slope:
-        row['slope'] = (float(row['train_loss'][25]) - float(row['train_loss'][-1])) / float(row['epochs'][-1])
+        row['slope'] = floats_list[40] - floats_list[-1] / (25 - len(floats_list))
         return row
     results = pd.read_csv(csv_path)
     results = results.apply(attach_best_train_loss, axis=1)

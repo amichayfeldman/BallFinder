@@ -6,6 +6,7 @@ import glob
 import re
 import numpy as np
 import imgaug.augmenters as iaa
+from imgaug.augmentables.segmaps import SegmentationMapsOnImage
 from Dataset.Augmentations import random_crop, flip_lr
 import matplotlib
 matplotlib.use('TKAgg')
@@ -15,7 +16,7 @@ sometimes = lambda aug: iaa.Sometimes(0.5, aug)
 
 
 class BallDataset(torch.utils.data.Dataset):
-    def __init__(self, images_list, gt_list, basic_res_w, basic_res_h, img_h, img_w, mode='train'):
+    def __init__(self, images_list, gt_list, basic_res_w, basic_res_h, mode='train'):
         self.data = pd.DataFrame(columns=['img_path', 'gt_path'])
         self.data['img_path'] = images_list
         self.gt_imgs_list = gt_list
@@ -23,8 +24,8 @@ class BallDataset(torch.utils.data.Dataset):
         self.data.dropna(axis=0, inplace=True)
         self.data.reset_index(drop=True, inplace=True)
 
-        self.img_w, self.img_h = img_w, img_h
         self.basic_res_w, self.basic_res_h = basic_res_w, basic_res_h
+        self.img_w, self.img_h = self.basic_res_w, self.basic_res_h
         self.mode = mode
 
     def assign_gt_to_img(self, row):
@@ -41,7 +42,7 @@ class BallDataset(torch.utils.data.Dataset):
         return len(self.data)
 
     def change_img_size(self):
-        random_w = np.random.randint(low=256, high=1280, size=(1,))[0]
+        random_w = np.random.randint(low=256, high=self.basic_res_w, size=(1,))[0]
         random_h = np.random.randint(low=int(random_w / 3), high=np.min(np.array([random_w, 720])), size=(1,))[0]
         self.img_w, self.img_h = random_w, random_h
 
@@ -60,23 +61,27 @@ class BallDataset(torch.utils.data.Dataset):
             sample = {'image': np.moveaxis(image, -1, 0) / 255, 'gt': gt_mask, 'idx': idx}
             return sample
         else:
-            seq = iaa.Sequential([iaa.OneOf([iaa.GaussianBlur((0, 3.0)),
-                                             iaa.AverageBlur(k=(2, 7)),
+            segmentation_map = SegmentationMapsOnImage(gt_mask, shape=image.shape)
+            seq = iaa.Sequential([iaa.ChangeColorTemperature((1100, 10000)),
+                                  iaa.CropAndPad(percent=(-0.25, 0.25)),
+                # iaa.OneOf([iaa.GaussianBlur((0, 3.0)),
+                                             # iaa.AverageBlur(k=(2, 7)),
                                              # iaa.MedianBlur(k=(3, 11))
-                                             ]),
+                                             # ]),
                                   sometimes(iaa.OneOf([iaa.Add((-10, 10), per_channel=0.5),
                                             iaa.Multiply((0.85, 1.15), per_channel=0.5)]))
                                   ])
 
-            augmented_img = seq(image=image)
-            flipped_or_not = flip_lr(image=augmented_img, gt_image=gt_mask)
-            after_crop = random_crop(image=flipped_or_not['image'], gt_image=flipped_or_not['gt'],
-                                     out_width=self.img_w, out_height=self.img_h)
+            augmented_img, augmented_map = seq(image=image, segmentation_maps=segmentation_map)
+            flipped_or_not = flip_lr(image=augmented_img, gt_image=augmented_map.arr[..., 0])
+            # after_crop = random_crop(image=flipped_or_not['image'], gt_image=flipped_or_not['gt'],
+            #                          out_width=self.img_w, out_height=self.img_h)
 
             # tensored_image = torch.from_numpy(after_crop['image'])
             # tensored_gt = torch.from_numpy(after_crop['gt'])
             # sample = {'image': tensored_image.permute(2, 0, 1) // 255, 'gt': tensored_gt, 'idx': idx}
-            sample = {'image': np.moveaxis(after_crop['image'], -1, 0) / 255, 'gt': after_crop['gt'], 'idx': idx}
+            sample = {'image': np.moveaxis(flipped_or_not['image'], -1, 0) / 255, 'gt': flipped_or_not['gt'],
+                      'idx': idx}
             return sample
 
 
@@ -97,7 +102,7 @@ def get_dataloaders(dataset_dict, gt_dict, batch_size, num_workers, config, shuf
         print("Building train set", end="")
         train_set = BallDataset(dataset_dict['train'], gt_dict['train'],
                                 basic_res_h=config.getint('Params', 'basic_res_h'),
-                                basic_res_w=config.getint('Params', 'basic_res_w'), img_h=720, img_w=1280, mode='train')
+                                basic_res_w=config.getint('Params', 'basic_res_w'), mode='train')
         print("...")
         train_dataloader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=shuffle,
                                                        num_workers=num_workers)
@@ -109,7 +114,7 @@ def get_dataloaders(dataset_dict, gt_dict, batch_size, num_workers, config, shuf
         print("Building val set", end="")
         val_set = BallDataset(dataset_dict['val'], gt_dict['val'],
                               basic_res_h=config.getint('Params', 'basic_res_h'),
-                              basic_res_w=config.getint('Params', 'basic_res_w'), img_h=720, img_w=1280, mode='val')
+                              basic_res_w=config.getint('Params', 'basic_res_w'), mode='val')
         print("...")
         val_dataloader = torch.utils.data.DataLoader(val_set, batch_size=batch_size, shuffle=shuffle,
                                                      num_workers=num_workers)
@@ -121,7 +126,7 @@ def get_dataloaders(dataset_dict, gt_dict, batch_size, num_workers, config, shuf
         print("Building val set", end="")
         test_set = BallDataset(dataset_dict['test'], gt_dict['test'],
                                basic_res_h=config.getint('Params', 'basic_res_h'),
-                               basic_res_w=config.getint('Params', 'basic_res_w'), img_h=720, img_w=1280, mode='test')
+                               basic_res_w=config.getint('Params', 'basic_res_w'), mode='test')
         print("...")
         test_dataloader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False,
                                                       num_workers=num_workers)

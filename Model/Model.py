@@ -1,6 +1,7 @@
 import torch
 from Utils.help_funcs import divide_input_to_patches
 
+
 def find_closest_num(n, m):
     q = int(n / m)
     n1 = m * q
@@ -18,6 +19,9 @@ def init_weights(m):
     if type(m) == torch.nn.Linear or type(m) == torch.nn.Conv2d:
         torch.nn.init.xavier_uniform_(m.weight)
         m.bias.data.fill_(0.01)
+    elif type(m) == torch.nn.BatchNorm2d:
+        torch.nn.init.uniform(m.weight)
+        m.bias.data.fill_(0)
 
 
 class BallDetector(torch.nn.Module):
@@ -33,7 +37,7 @@ class BallDetector(torch.nn.Module):
                                           torch.nn.ReLU(inplace=True),
                                           torch.nn.MaxPool2d(kernel_size=2))
 
-        block2_c = 16
+        block2_c = 32
         self.block2 = torch.nn.Sequential(torch.nn.Conv2d(in_channels=block1_c, out_channels=block2_c, kernel_size=3,
                                                           padding=1),
                                           torch.nn.BatchNorm2d(num_features=block2_c),
@@ -47,7 +51,7 @@ class BallDetector(torch.nn.Module):
         # self.upsample2 = torch.nn.ConvTranspose2d(in_channels=16, out_channels=16, kernel_size=2)
         # self.upsample2 = torch.nn.Upsample(scale_factor=2, mode='bicubic')
 
-        block3_c = 32
+        block3_c = 64
         self.block3 = torch.nn.Sequential(torch.nn.Conv2d(in_channels=block2_c, out_channels=block3_c, kernel_size=3,
                                                           padding=1),
                                           torch.nn.BatchNorm2d(num_features=block3_c),
